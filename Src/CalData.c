@@ -22,15 +22,17 @@ static SystemCalDataType localCalData =
       // non zero values to make the math not crash.
       // these get updated and written into
       // flash in calibration
-     /*  */ 0.0f,
+      .frontZero = 0.0f,
       .backZero  = 0.0f,
       .frontAtCal = 1000.0f, // made up
       .backAtCal =  1000.0f, // made up
       .frontSlope = 1.0f,  // made up
       .backSlope = 1.0f,   // made up
       .calWeight = 500.00f, // made up
-      .WingPegDist = 119.8f, // some nominal value
-      .LEstopperDist = 30.0f // some nominal value
+      .WingPegDist = 120.0f, // some nominal value
+      .LEstopperDist = 30.0f, // some nominal value
+      .frontGain  = 3,
+      .backGain = 3
    }
 };
 /**

@@ -317,6 +317,18 @@ static uint8_t  valueIndex;
 static int32_t  currentFrontAverage;
 static int32_t  currentBackAverage;
 
+void setHX711Gain(uint32_t newFrontGain,uint32_t newBackGain)
+{
+   if(newFrontGain >=1 && newFrontGain <= 3)
+   {
+      frontGain = newFrontGain;
+   }
+   if(newBackGain >=1 && newBackGain <= 3)
+   {
+      backGain = newBackGain;
+   }
+}
+
 /**
  * Get the current averages. 
  * Critical region makes sure we get a good pair of values. 
@@ -425,7 +437,7 @@ void medianFilter(void)
  * 
  * @param values 
  */
-static void sort5(int32 values[])
+static void sort5(int32_t values[])
 {
    int i,j;
    int32 temp;

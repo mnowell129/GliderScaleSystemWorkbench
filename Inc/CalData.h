@@ -22,6 +22,8 @@ typedef struct ScaleCalibrationType
    float                   calWeight;
    float                   WingPegDist;
    float                   LEstopperDist;
+   uint32_t                frontGain;
+   uint32_t                backGain;
 }ScaleCalibrationType;
 typedef ScaleCalibrationType *ScaleCalibrationPtr;
 

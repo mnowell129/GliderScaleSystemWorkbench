@@ -201,7 +201,7 @@ void tsTaskFunction(void *argument)
          if(error == pdFAIL)
          {
             // busy, kill some extra time
-            vTaskDelay(200); 
+            vTaskDelay(200);
          }
 
          vTaskDelay(200); // kill some time if someone presses so that we don't get ahead.
@@ -681,7 +681,7 @@ GetOrTimeout getOkOrCancelTimeout(uint32_t timeout)
  * 
  * @return bool 
  */
-bool getValue(char *msg,float value, uint32_t whole, uint32_t fraction, float *result)
+bool getFloatValue(char *msg,float value, uint32_t whole, uint32_t fraction, float *result)
 {
    static char buffer[80];
    int digitIndex; // needs to be signed
@@ -802,6 +802,111 @@ bool getValue(char *msg,float value, uint32_t whole, uint32_t fraction, float *r
       }
    }
 }
+bool getIntegerValue(char *msg,uint32_t value, uint32_t whole, uint32_t *result)
+{
+   static char buffer[80];
+   int digitIndex; // needs to be signed
+   int digits;
+   char digit;
+   int32_t keyStroke;
+   uint32_t x,y;
+   // Clear the screen and put up the navigation/edit buttons
+   BSP_LCD_Clear(LCD_COLOR_BLACK);
+   button(60,50,25,"OK",LCD_COLOR_GREEN,LCD_COLOR_BLACK);
+   button(180,50,25,"X",LCD_COLOR_YELLOW,LCD_COLOR_BLACK);
+   arrowPad(120,240);
+
+   // get the value into an editable string
+   sprintf(buffer,"%*d",(int)whole,value);
+   digits = strlen(buffer);
+   digitIndex = 0;
+   // mark one digit as highlighted
+   buffer[digitIndex] |= 0x80;
+   // clear a whole and write the value
+   printText(120,120,buffer,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE);
+   printfLCD(120,90,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"%s",msg);
+
+   while(1)
+   {
+      // wait for and then classify a touch
+      getTouch(&x,&y);
+      keyStroke = classifyGetValueScreenInput(x,y);
+      // if a valid touch in our set of values
+      if(keyStroke >= 0)
+      {
+         // Do the press action
+         switch(keyStroke)
+         {
+            case GET_OK:
+               // remove the highlight that would screw up conversion
+               buffer[digitIndex] &= 0x7f;
+               // convert back to float
+               *result = atoi(buffer);
+               // return success
+               return(true);
+               break;
+            case GET_CANCEL:
+               return(false);
+               break;
+            case GET_UP:
+               // unhighlight a digit and increment it, allow rollover
+               digit = buffer[digitIndex];
+               digit &= 0x7f;
+               digit++;
+               if(digit > '9')
+               {
+                  digit = '0';
+               }
+               digit |= 0x80; // re highlight
+               buffer[digitIndex] = digit;
+               // repaint
+               printText(120,120,buffer,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE);
+               break;
+            case GET_DOWN:
+               // unhighlight a digit and decrement it, allow rollover
+               digit = buffer[digitIndex];
+               digit &= 0x7f;
+               digit--;
+               if(digit < '0')
+               {
+                  digit = '9';
+               }
+               digit |= 0x80; // re highlight
+               buffer[digitIndex] = digit;
+               printText(120,120,buffer,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE);
+               break;
+            case GET_RIGHT:
+               // Move right do end cases, skip over the decimal point
+               // move the highlight
+               buffer[digitIndex] &= 0x7f;
+               digitIndex++;
+               if(digitIndex >= digits)
+               {
+                  digitIndex = 0;
+               }
+               buffer[digitIndex] |= 0x80;
+               printText(120,120,buffer,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE);
+               break;
+            case GET_LEFT:
+               // move left, skip decimal point, do end cases
+               // move the highlight
+               buffer[digitIndex] &= 0x7f;
+               digitIndex--;
+               if(digitIndex < 0)
+               {
+                  digitIndex = digits - 1;
+               }
+               buffer[digitIndex] |= 0x80;
+               printText(120,120,buffer,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE);
+               break;
+         }
+      }
+      else
+      {
+         // printfLCD(120,100,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"Key is --",keyStroke);
+      }
+   }
+}
 
 
 /**
@@ -898,32 +1003,34 @@ void sort5(float values[])
 // This is the working data that is restored from flash.
 /*****************************************************************************/
 /*****************************************************************************/
-ScaleCalibrationType  scaleCalibrationData = 
+ScaleCalibrationType  scaleCalibrationData =
 {
    // non zero values to make the math not crash.
    // these get updated and written into
    // flash in calibration
-     /* .frontZero = */ 0.0f,
-     /* .backZero  = */ 0.0f,
-     /* .frontAtCal = */ 1000.0f, // made up
-     /* .backAtCal = */  1000.0f, // made up
-     /* .frontSlope = */ 1.0f,  // made up
-     /* .backSlope = */ 1.0f,   // made up
-     /* .calWeight = */ 500.00f, // made up
-     /* .WingPegDist = */ 119.8f, // some nominal value
-     /* .LEstopperDist = */ 30.0f // some nominal value
+   .frontZero     =  0.0f,
+   .backZero      =  0.0f,
+   .frontAtCal    =  1000.0f,   // made up
+   .backAtCal     =  1000.0f,   // made up
+   .frontSlope    =  1.0f,      // made up
+   .backSlope     =  1.0f,      // made up
+   .calWeight     =  5000.00f,  // made up
+   .WingPegDist   =  120.0f,    // some nominal value
+   .LEstopperDist =  30.0f,     // some nominal value
+   .frontGain     =  3,
+   .backGain      =  3
 };
 void initCalData(void)
 {
-  scaleCalibrationData.frontZero = 0.0f;
-  scaleCalibrationData.backZero  = 0.0f;
-  scaleCalibrationData.frontAtCal = 1000.0f; // made up
-  scaleCalibrationData.backAtCal =  1000.0f; // made up
-  scaleCalibrationData.frontSlope = 1.0f;  // made up
-  scaleCalibrationData.backSlope = 1.0f;   // made up
-  scaleCalibrationData.calWeight = 500.00f; // made up
-  scaleCalibrationData.WingPegDist = 119.8f; // some nominal value
-  scaleCalibrationData.LEstopperDist = 30.0f; // some nominal value
+   scaleCalibrationData.frontZero = 0.0f;
+   scaleCalibrationData.backZero  = 0.0f;
+   scaleCalibrationData.frontAtCal = 1000.0f; // made up
+   scaleCalibrationData.backAtCal =  1000.0f; // made up
+   scaleCalibrationData.frontSlope = 1.0f;  // made up
+   scaleCalibrationData.backSlope = 1.0f;   // made up
+   scaleCalibrationData.calWeight = 500.00f; // made up
+   scaleCalibrationData.WingPegDist = 119.8f; // some nominal value
+   scaleCalibrationData.LEstopperDist = 30.0f; // some nominal value
 }
 /*****************************************************************************/
 /*****************************************************************************/
@@ -987,24 +1094,31 @@ void readSensors(float *front,float *back, bool displayOn)
  * 
  * @return bool 
  */
-bool promptMessage(char *textA,char *textB,...)
+bool promptMessage(bool waitForAnswer,char *textA,char *textB,...)
 {
    va_list list;
    va_start(list,textB);
+
+   BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+   BSP_LCD_FillRect(0,120,240,180);
    printfLCD(120,120,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,textA);
    _printfLCD(120,150,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,textB,list);
    button(60,50,25,"OK",LCD_COLOR_GREEN,LCD_COLOR_BLACK);
    button(180,50,25,"X",LCD_COLOR_YELLOW,LCD_COLOR_BLACK);
    va_end(list);
-   return(getOkOrCancel());
+   if(waitForAnswer)
+   {
+      return(getOkOrCancel());
+   }
+   return(true);
+
 }
 
 /**
  * The calibration function. 
- * Called at startup if flash is corrupt/emtpy. 
- * Or called on demand by user. 
- * At any stage if cancel is hit (X) 
- * returns false and doesn't complete. 
+ * Called at startup if flash is corrupt/empty. 
+ * Or called on demand by user. At any stage if cancel is hit 
+ * (X) returns false and doesn't complete. 
  * 
  * @author Charles "Mickey" Nowell (3/26/2018)
  * 
@@ -1026,30 +1140,32 @@ bool calibrationOperation(bool justWeigh)
    if(!justWeigh)
    {
 
+      if(!getIntegerValue("Front Gain(1-3)",scaleCalibrationData.frontGain,1,&scaleCalibrationData.frontGain))
+      {
+         return(false);
+      }
+      if(!getIntegerValue("Back Gain(1-3)",scaleCalibrationData.backGain,1,&scaleCalibrationData.backGain))
+      {
+         return(false);
+      }
+      setHX711Gain(scaleCalibrationData.frontGain,scaleCalibrationData.backGain);
+      // let scale adjust
+      vTaskDelay(200);
       BSP_LCD_Clear(LCD_COLOR_BLACK);
-      choice = promptMessage("Clear Scale","Hit ok");
+      choice = promptMessage(true,"Clear Scale","Hit ok");
       if(!choice)
       {
          return(false);
       }
       // now get the front and rear samples.
       readSensors(&(scaleCalibrationData.frontZero),&(scaleCalibrationData.backZero),true);
-//
-      if(getValue("Cal Weight(g)",scaleCalibrationData.calWeight,4,2,&scaleCalibrationData.calWeight))
-      {
-         BSP_LCD_Clear(LCD_COLOR_BLACK);
-         choice = promptMessage("Cal Weight","= %4.2f",scaleCalibrationData.calWeight);
-         if(!choice)
-         {
-            return(false);
-         }
-      }
-      else
+
+      if(!getFloatValue("Cal Weight(g)",scaleCalibrationData.calWeight,4,2,&scaleCalibrationData.calWeight))
       {
          return(false);
       }
       BSP_LCD_Clear(LCD_COLOR_BLACK);
-      choice = promptMessage("Put weight(F)","Hit ok");
+      choice = promptMessage(true,"Put weight(FT)","Hit ok");
       if(!choice)
       {
          return(false);
@@ -1057,7 +1173,7 @@ bool calibrationOperation(bool justWeigh)
       readSensors(&(scaleCalibrationData.frontAtCal),&dummy,true);
 
       BSP_LCD_Clear(LCD_COLOR_BLACK);
-      choice = promptMessage("Put weight(R)","Hit ok");
+      choice = promptMessage(true,"Put weight(BK)","Hit ok");
       if(!choice)
       {
          return(false);
@@ -1068,7 +1184,7 @@ bool calibrationOperation(bool justWeigh)
       scaleCalibrationData.backSlope = scaleCalibrationData.calWeight / (scaleCalibrationData.backAtCal - scaleCalibrationData.backZero);
 
       BSP_LCD_Clear(LCD_COLOR_BLACK);
-      choice = promptMessage("Remove Weight","Hit ok");
+      choice = promptMessage(true,"Remove Weight","Hit ok");
       if(!choice)
       {
          return(false);
@@ -1077,23 +1193,19 @@ bool calibrationOperation(bool justWeigh)
 
    // get span
    BSP_LCD_Clear(LCD_COLOR_BLACK);
-   if(!getValue("Span(mm)",scaleCalibrationData.WingPegDist,4,2,&scaleCalibrationData.WingPegDist))
+   if(!getFloatValue("Span(mm)",scaleCalibrationData.WingPegDist,4,2,&scaleCalibrationData.WingPegDist))
    {
       return(false);
    }
 
    BSP_LCD_Clear(LCD_COLOR_BLACK);
-   if(!getValue("Offset(mm)",scaleCalibrationData.LEstopperDist,4,2,&scaleCalibrationData.LEstopperDist))
+   if(!getFloatValue("Offset(mm)",scaleCalibrationData.LEstopperDist,4,2,&scaleCalibrationData.LEstopperDist))
    {
       return(false);
    }
 
-
    BSP_LCD_Clear(LCD_COLOR_BLACK);
-   printfLCD(120,120,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"Sample Weigh");
-   printfLCD(120,150,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"Hit ok");
-   button(60,50,25,"OK",LCD_COLOR_GREEN,LCD_COLOR_BLACK);
-   button(180,50,25,"X",LCD_COLOR_YELLOW,LCD_COLOR_BLACK);
+   choice = promptMessage(false,"Sample Weigh","Hit ok");
    {
       GetOrTimeout whatToDo;
       int counter;
@@ -1122,10 +1234,10 @@ bool calibrationOperation(bool justWeigh)
          {
             sort5(fValues);
             sort5(bValues);
-            printfLCD(120,180,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"           ");
-            printfLCD(120,210,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"           ");
-            printfLCD(120,180,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"F=%04.2f",fValues[2]);
-            printfLCD(120,210,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"B=%04.2f",bValues[2]);
+            BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+            BSP_LCD_FillRect(0,180,240,300);
+            printfLCD(120,180,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"FT=%04.2f",fValues[2]);
+            printfLCD(120,210,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"BK=%04.2f",bValues[2]);
             counter = 0;
          }
       }
@@ -1147,14 +1259,14 @@ void tareOperation(void)
 {
    bool choice;
    BSP_LCD_Clear(LCD_COLOR_BLACK);
-   choice = promptMessage("Emtpy scale!","Hit ok");
+   choice = promptMessage(true,"Empty scale!","Hit ok");
    if(!choice)
    {
       return;;
    }
    // now get the front and rear samples.
    readSensors(&(scaleCalibrationData.frontZero),&(scaleCalibrationData.backZero),true);
-   choice = promptMessage("Tare Complete","Hit ok");
+   choice = promptMessage(true,"Tare Complete","Hit ok");
 
 }
 
@@ -1177,10 +1289,7 @@ void runOperation(void)
    float                   CGoffset = ((scaleCalibrationData.WingPegDist / 2) + scaleCalibrationData.LEstopperDist);
 
    BSP_LCD_Clear(LCD_COLOR_BLACK);
-   printfLCD(120,120,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"Results");
-   printfLCD(120,150,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"Hit ok");
-   button(60,50,25,"OK",LCD_COLOR_GREEN,LCD_COLOR_BLACK);
-   button(180,50,25,"X",LCD_COLOR_YELLOW,LCD_COLOR_BLACK);
+   promptMessage(false,"Reading","");
    {
       GetOrTimeout whatToDo;
       int counter;
@@ -1216,13 +1325,13 @@ void runOperation(void)
             backToFrontRatio = (backLoad) / (frontLoad + backLoad);
             cgLocation = (((scaleCalibrationData.WingPegDist) * backToFrontRatio)) - ((scaleCalibrationData.WingPegDist) / 2) + CGoffset;
 
-            printfLCD(120,180,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"             ");
-            printfLCD(120,210,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"             ");
-            printfLCD(120,240,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"             ");
-            printfLCD(120,270,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"             ");
-            printfLCD(120,180,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"F=%04.2f",frontLoad);
-            printfLCD(120,210,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"B=%04.2f",backLoad);
-            printfLCD(120,240,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"T=%04.2f",frontLoad + backLoad);
+
+            BSP_LCD_SetTextColor(LCD_COLOR_BLACK);
+            BSP_LCD_FillRect(0,180,240,300);
+
+            printfLCD(120,180,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"FT SNSR=%04.2f",frontLoad);
+            printfLCD(120,210,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"BK SNSR=%04.2f",backLoad);
+            printfLCD(120,240,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"AUW=%04.2f",frontLoad + backLoad);
             printfLCD(120,270,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"CG=%04.2fmm",cgLocation);
             counter = 0;
          }
@@ -1437,6 +1546,8 @@ void screenApp(void)
       loadTSCalibration(&localTSCalData);
       configureTouchScreen(&localTSCalData);
       loadScaleCalibration(&scaleCalibrationData);
+      setHX711Gain(scaleCalibrationData.frontGain,scaleCalibrationData.backGain);
+
       // have to wait and do this here because
       // the ts cal mucks with what the task wants to do
       // and apparently the library is not reentrant
@@ -1464,6 +1575,7 @@ void screenApp(void)
       {
          updateScaleCalibration(&scaleCalibrationData);
       }
+      setHX711Gain(scaleCalibrationData.frontGain,scaleCalibrationData.backGain);
       // save the cal
       BSP_LCD_Clear(LCD_COLOR_BLACK);
       printfLCD(120,120,LCD_COLOR_WHITE,LCD_COLOR_BLACK,&Font24,CENTER_MODE,"Saving");

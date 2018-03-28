@@ -6,6 +6,7 @@
 #define hx711Task_STACK_SIZE     512
 void startHX711Task(void);
 
+void setHX711Gain(uint32_t newFrontGain,uint32_t newBackGain);
 
 void getLoadCellValues(int32_t *frontValue,int32_t *backValue);
 
